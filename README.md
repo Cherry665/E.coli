@@ -11,13 +11,13 @@ datasets rehydrate --directory my_genomes_data/
 
 ## 两步法去冗余
 ```bash
+# 第一步
 # 创建 MinHash 草图
 cd /scratch/wangq/cl/E.coli
 find $(pwd)/data -name "*.fna" > all_fna_list.txt
 mkdir -p chunk_lists
 split -l 2000 -d -a 2 all_fna_list.txt chunk_lists/chunk_
 
-## 提交任务
 bsub < script/mash_lsf.sh
 
 ## 合并结果
@@ -28,8 +28,8 @@ bsub < script/mash_dist.sh
 
 # 聚类
 bsub < script/hnsm_cluster.sh
-wc -l result/cluster0.005.tsv
-# 2033 result/cluster0.005.tsv
+wc -l result/cluster0.004.tsv
+# 3923 result/cluster0.04.tsv
 
 # 清理并统计
 cd /scratch/wangq/cl/E.coli/result
@@ -46,11 +46,28 @@ awk '{
         }
     }
     print $0
-}' cluster0.005.tsv > cluster_GCF.tsv
+}' cluster0.004.tsv > cluster_GCF.tsv
 sed -i 's/ /\t/g' cluster_GCF.tsv
 wc -w cluster_GCF.tsv
 # 40470 cluster_GCF.tsv
 
+# 提取只有一列的行
+mkdir -p NR
+cd /scratch/wangq/cl/E.coli
+awk -F'\t' 'NF == 1' result/cluster_GCF.tsv > NR/cluster_0.004_NR.txt
+wc -l NR/cluster_0.004_NR.txt
+# 2221 NR/cluster_0.004_NR.txt
+
+# 提取多于一列的行
+awk -F'\t' 'NF > 1' result/cluster_GCF.tsv > result/cluster_GCF_many.tsv
+wc -l result/cluster_GCF_many.tsv
+# 1702 result/cluster_GCF_many.tsv
+
+# 形成只有两列的比对文件(在自己linux上)
+cd ~/E.coli
+python3 script/pairs_genome.py -i result/cluster_GCF_many.tsv -o result/pairs_genome.tsv
+
+# 第二步
 # 序列比对
 cd /scratch/wangq/cl/E.coli
 bsub < script/redundant1.sh
