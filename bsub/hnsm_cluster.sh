@@ -8,4 +8,4 @@
 #BSUB -R rusage[mem=10GB]
 
 
-hnsm cluster --mode dbscan --eps 0.005 result/mash_distance.tsv -o result/cluster0.005.tsv
+hnsm cluster --mode dbscan --eps 0.004 result/mash_distance.tsv -o result/cluster0.004.tsv
