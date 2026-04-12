@@ -20,14 +20,17 @@ export PATH=/scratch/wangq/cl/app/hnsm/target/x86_64-unknown-linux-gnu/release:$
 
 mkdir -p "$output_dir"
 
+export TMPDIR=/scratch/wangq/cl/E.coli/my_tmp
+mkdir -p $TMPDIR
+
 process_strains() {
     local strain1=$1
     local strain2=$2
     local output_dir=$3
 
-    local temp_dir=$(mktemp -d -p "$output_dir" tempdir_XXXXXX)
-    cp "/scratch/wangq/cl/E.coli/data/$strain1/genome.fna" "$temp_dir/1.fa"
-    cp "/scratch/wangq/cl/E.coli/data/$strain2/genome.fna" "$temp_dir/2.fa"
+    local temp_dir=$(mktemp -d -p $TMPDIR tempdir_XXXXXX)
+    sed 's/ .*//' "/scratch/wangq/cl/E.coli/data/$strain1/genome.fna" > "$temp_dir/1.fa"
+    sed 's/ .*//' "/scratch/wangq/cl/E.coli/data/$strain2/genome.fna" > "$temp_dir/2.fa"
 
     # 第一步：FastGA，限制时间为 30 秒
     if timeout 30s FastGA -v -psl -T1 "$temp_dir/1.fa" "$temp_dir/2.fa" > "$temp_dir/${strain1}_${strain2}.psl" 2>/dev/null; then
@@ -59,7 +62,7 @@ process_strains() {
 
 export -f process_strains
 
-parallel -j 23 --colsep '\t' process_strains {1} {2} "$output_dir" :::: "$input_file"
+parallel -j 15 --colsep '\t' process_strains {1} {2} "$output_dir" :::: "$input_file"
 
 > "$output_dir/result.list"
 for i in "$output_dir"/*.tsv; do
@@ -68,3 +71,4 @@ done
 
 # 删除所有 .tsv 文件
 rm -f "$output_dir"/*.tsv
+rm -rf "$TMPDIR"
