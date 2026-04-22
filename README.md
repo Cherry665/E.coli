@@ -63,13 +63,16 @@ awk -F'\t' 'NF > 1' result/cluster_GCF.tsv > result/cluster_GCF_many.tsv
 wc -l result/cluster_GCF_many.tsv
 # 1702 result/cluster_GCF_many.tsv
 
-# 形成只有两列的比对文件(在自己linux上)
+# 形成只有两列的比对文件
 cd ~/E.coli
 python3 script/pairs_genome.py -i result/cluster_GCF_many.tsv -o result/pairs_genome.tsv
 
 # 第二步
 # 序列比对
 cd /scratch/wangq/cl/E.coli
+split -n l/35 -d -a 2 pairs_genome.tsv sub_pairs_
+
+# 出现 core 文件可反向再执行一次
 bsub < script/redundant1.sh
 
 # 聚类
@@ -80,4 +83,19 @@ hnsm cluster --mode dbscan --eps 0.0001 -i result/divergent.tsv -o result/cluste
 python script/rep_strains.py -i result/divergent.tsv -c result/cluster0.0001.tsv  -o output/rep_strains.txt
 
 ```
+## ClermonTyping
+```bash
+# 生成所有基因组的绝对路径列表
+cd /scratch/wangq/cl/E.coli/ClermonTyping
+find /scratch/wangq/cl/E.coli/data -name "*.fna" > all_genomes.list
+# 拆分成 10 个小文件
+split -l 4047 -d --additional-suffix=.list all_genomes.list task_list_
 
+bsub < ClermonTyping_run.sh
+# 合并
+find results_part_* -name "*_result.txt" -size +0c -exec cat {} + > total_phylogroups.txt
+cut -f 1,5 total_phylogroups.txt > phylogroup_clean.txt
+
+Rscript pie.R phylogroup_clean.txt phylogroup_pie_40470
+# 去冗余后的绘图同上
+```
