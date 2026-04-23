@@ -76,26 +76,73 @@ split -n l/35 -d -a 2 pairs_genome.tsv sub_pairs_
 bsub < script/redundant1.sh
 
 # 聚类
-awk '{print $1"\t"$2"\t"$3}' result/result.list > result/divergent.tsv
-hnsm cluster --mode dbscan --eps 0.0001 -i result/divergent.tsv -o result/cluster0.0001.tsv
+awk '{print $1"\t"$2"\t"$3}' result.list > NR/divergent.tsv
+hnsm cluster --mode dbscan --eps 0.0001 -i NR/divergent.tsv -o NR/cluster0.0001.tsv
+# 试一下不用 sort | uniq 可不可以
+cat NR/cluster_0.004_NR.txt NR/cluster0.0001.tsv | sort | uniq > NR/cluster0.0001_all.tsv
 
 # 选择代表性菌株
-python script/rep_strains.py -i result/divergent.tsv -c result/cluster0.0001.tsv  -o output/rep_strains.txt
-
+python script/rep_strains.py -i NR/divergent.tsv -c NR/cluster0.0001.tsv  -o NR/rep_strains.txt
+cat NR/cluster_0.004_NR.txt NR/rep_strains.txt > NR/strains_nr.txt
 ```
 ## ClermonTyping
 ```bash
 # 生成所有基因组的绝对路径列表
 cd /scratch/wangq/cl/E.coli/ClermonTyping
 find /scratch/wangq/cl/E.coli/data -name "*.fna" > all_genomes.list
+
 # 拆分成 10 个小文件
 split -l 4047 -d --additional-suffix=.list all_genomes.list task_list_
-
+mkdir -p logs
 bsub < ClermonTyping_run.sh
+
 # 合并
 find results_part_* -name "*_result.txt" -size +0c -exec cat {} + > total_phylogroups.txt
-cut -f 1,5 total_phylogroups.txt > phylogroup_clean.txt
+awk -F'\t' '{print $1 "\t" $(NF-1)}' total_phylogroups.txt > phylogroup_clean.txt
 
+# 绘图
 Rscript pie.R phylogroup_clean.txt phylogroup_pie_40470
-# 去冗余后的绘图同上
+# 去冗余后的类群分布同上
 ```
+
+## zipf
+```bash
+cd /scratch/wangq/cl/E.coli
+mkdir -p zipf
+
+# 生成 genome_count.tsv 文件，用于绘制 zipf 图
+echo -e "Number\tCount" > zipf/genome_count.tsv
+awk -F'\t' '{print NF}' NR/cluster0.0001_all.tsv | sort -rn | awk '{print NR "\t" $1}' >> zipf/genome_count.tsv
+
+# 生成带聚类号（cluster1、cluster2...）的聚类结果
+awk '{print "cluster" NR "\t" $0}' NR/cluster0.0001_all.tsv > zipf/cluster_id.tsv
+
+# 生成具有 GCF_ID、cluster_ID、phylogroup 三列的分类文件
+awk -F'\t' '
+NR==FNR {
+    c_id = $1;
+    for (i=2; i<=NF; i++) {
+        if ($i != "") map[$i] = c_id;
+    }
+    next;
+}
+
+{
+    g_id = $1;
+    group = $2;
+    c_id = (g_id in map) ? map[g_id] : "Unclustered";
+    if (FNR == 1) print "GCF_ID\tCluster_ID\tPhylogroup";
+    print g_id "\t" c_id "\t" group;
+}' zipf/cluster_id.tsv ClermonTyping/phylogroup_clean.txt > zipf/GCF_cluster_phylogroup.tsv
+
+# 拟合齐普夫定律模型，genome_count.tsv 和 zipf_data.R 在同一个目录下
+cd zipf
+Rscript zipf_data.R
+
+# 绘图，根据 genome_count.tsv 
+Rscript zipf_figure.R
+
+# 基因组重复次数条形图
+Rscript duplicate.R
+```
+
