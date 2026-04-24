@@ -70,7 +70,7 @@ python3 script/pairs_genome.py -i result/cluster_GCF_many.tsv -o result/pairs_ge
 # 第二步
 # 序列比对
 cd /scratch/wangq/cl/E.coli
-split -n l/35 -d -a 2 pairs_genome.tsv sub_pairs_
+split -n l/20 -d -a 2 pairs_genome.tsv sub_pairs_
 
 # 出现 core 文件可反向再执行一次
 bsub < script/redundant1.sh
@@ -142,7 +142,27 @@ Rscript zipf_data.R
 # 绘图，根据 genome_count.tsv 
 Rscript zipf_figure.R
 
-# 基因组重复次数条形图
+# 基因组重复次数条形图（根据生成的 zipf/GCF_cluster_phylogroup.tsv 改）
 Rscript duplicate.R
 ```
 
+tsv-join --filter-file success_change.tsv --exclude pairs_genome.tsv > pairs_genome1.tsv
+split -n l/35 -d -a 2 pairs_genome1.tsv sub_pairs_
+for d in NR2/nr_*; do
+     printf "%s: " "$d"
+     find "$d" -maxdepth 1 | wc -l
+ done
+ rsync -a --delete empty_dir/ /scratch/wangq/cl/E.coli/NR2/
+
+ find . -name "result.list" -type f -size +0c -exec cat {} + > result1.list
+ find . -name "*.tsv" -type f -size +0c -exec cat {} + >> result1.list
+ rgr dedup result1.list > result1.list.tmp && mv result1.list.tmp result1.list
+
+ for d in nr_01 nr_04 nr_07; do
+     cat $d/result.list >> result1.list
+ done
+ tsv-join --filter-file success_change.tsv --exclude sub_pairs_10 > sub_pairs_10_1 && mv sub_pairs_10_1 sub_pairs_10
+ cat result1.list >> ../result.list
+ for d in nr_*; do
+     rm -fr $d/*
+ done
