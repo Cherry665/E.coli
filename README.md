@@ -70,7 +70,7 @@ python3 script/pairs_genome.py -i result/cluster_GCF_many.tsv -o result/pairs_ge
 # 第二步
 # 序列比对
 cd /scratch/wangq/cl/E.coli
-split -n l/20 -d -a 2 pairs_genome.tsv sub_pairs_
+split -n l/35 -d -a 2 pairs_genome.tsv sub_pairs_
 
 # 出现 core 文件可反向再执行一次
 bsub < script/redundant1.sh
