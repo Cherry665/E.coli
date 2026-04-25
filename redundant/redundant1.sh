@@ -1,6 +1,6 @@
 #!/bin/bash
 BASE_DIR="/scratch/wangq/cl/E.coli"
-for i in {00..19}; do
+for i in {00..99}; do
     INPUT="$BASE_DIR/result/sub_pairs_$i"
     OUTPUT="$BASE_DIR/NR1/nr_$i"
 
