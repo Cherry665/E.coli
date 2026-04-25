@@ -26,28 +26,27 @@ trap 'rm -rf "$TMPDIR"' EXIT
 process_strains() {
     local strain1=$1
     local strain2=$2
-    local output_dir=$3
 
     local temp_dir=$(mktemp -d -p $TMPDIR tempdir_XXXXXX)
     trap 'rm -rf "$temp_dir"' EXIT
     sed 's/ .*//' "/scratch/wangq/cl/E.coli/data/$strain1/genome.fna" > "$temp_dir/1.fa"
     sed 's/ .*//' "/scratch/wangq/cl/E.coli/data/$strain2/genome.fna" > "$temp_dir/2.fa"
 
-    # 第一步：FastGA，限制时间为 30 秒
-    if timeout 30s FastGA -v -psl -T1 "$temp_dir/1.fa" "$temp_dir/2.fa" > "$temp_dir/${strain1}_${strain2}.psl" 2>/dev/null; then
-        echo "FastGA completed for $strain1 and $strain2."
+    # 第一步：FastGA，限制时间为 2 分钟
+    if timeout 2m FastGA -v -psl -T1 "$temp_dir/1.fa" "$temp_dir/2.fa" > "$temp_dir/${strain1}_${strain2}.psl" 2>/dev/null; then
+        echo "FastGA completed for $strain1 and $strain2." >&2
     else
-        echo "FastGA timed out for $strain1 and $strain2. Skipping..."
+        echo "FastGA timed out for $strain1 and $strain2. Skipping..." >&2
         touch "$temp_dir/${strain1}_${strain2}.fastga_timeout"
         rm -rf "$temp_dir"  # 删除临时文件
         return  # 跳过后续步骤
     fi
 
-    # 第二步：pgr chain，限制时间为 1 分钟
-    if timeout 1m pgr chain --syn "$temp_dir/2.fa" "$temp_dir/1.fa" "$temp_dir/${strain1}_${strain2}.psl" > "$temp_dir/${strain1}_${strain2}.maf" 2>/dev/null; then
-        echo "pgr chain completed for $strain1 and $strain2."
+    # 第二步：pgr chain，限制时间为 4 分钟
+    if timeout 4m pgr chain --syn "$temp_dir/2.fa" "$temp_dir/1.fa" "$temp_dir/${strain1}_${strain2}.psl" > "$temp_dir/${strain1}_${strain2}.maf" 2>/dev/null; then
+        echo "pgr chain completed for $strain1 and $strain2." >&2
     else
-        echo "pgr chain timed out for $strain1 and $strain2. Skipping..."
+        echo "pgr chain timed out for $strain1 and $strain2. Skipping..." >&2
         touch "$temp_dir/${strain1}_${strain2}.pgr_timeout"
         rm -rf "$temp_dir"  # 删除临时文件
         return  # 跳过后续步骤
@@ -55,7 +54,12 @@ process_strains() {
 
     # 后续步骤  使用了wgatools python脚本
     wgatools maf2paf "$temp_dir/${strain1}_${strain2}.maf" > "$temp_dir/${strain1}_${strain2}.paf"
-    python3 /scratch/wangq/cl/E.coli/script/paf_intrac.py -i "$temp_dir/${strain1}_${strain2}.paf" -o "$output_dir/${strain1}_${strain2}.tsv" -q "$strain1" -t "$strain2"
+    python3 /scratch/wangq/cl/E.coli/script/paf_intrac.py -i "$temp_dir/${strain1}_${strain2}.paf" -o "$temp_dir/tmp.tsv" -q "$strain1" -t "$strain2"
+
+    # 删除临时文件
+    if [ -f "$temp_dir/tmp.tsv" ]; then
+        cat "$temp_dir/tmp.tsv"
+    fi
 
     # 删除临时文件
     rm -rf "$temp_dir"
@@ -63,13 +67,4 @@ process_strains() {
 
 export -f process_strains
 
-parallel -j 23 --colsep '\t' process_strains {1} {2} "$output_dir" :::: "$input_file"
-
-> "$output_dir/result.list"
-
-for i in "$output_dir"/*.tsv; do
-    cat "$i" >> "$output_dir/result.list"
-done
-
-# 删除所有 .tsv 文件
-rm -f "$output_dir"/*.tsv
+parallel -j 23 --colsep '\t' process_strains {1} {2} :::: "$input_file" > "$output_dir/result.list"
