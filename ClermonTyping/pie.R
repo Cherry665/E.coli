@@ -16,20 +16,29 @@ group_colors <- c(
     "E" = "#e54c5e", 
     "F" = "#254380", 
     "G" = "#9e4c0d", 
-    "others" = "#467128", 
+    "Clade I+III+IV+Others" = "#467128", 
     "Shig" = "#917001"
 )
 
 # 统计分组数量
 count_phylogroup_percentage <- function(multpcr_phylogroup_file) {
-    df <- read.table(multpcr_phylogroup_file, sep = "\t", header = FALSE)
-    phylo_counts <- as.data.frame(table(df$V2))
-    colnames(phylo_counts) <- c("phylogroup", "count")
-    return(phylo_counts)
+  df <- read.table(multpcr_phylogroup_file, sep = "\t", header = FALSE, stringsAsFactors = FALSE)
+  df <- df[!is.na(df$V2), ]
+
+  df$V2[df$V2 %in% c("cladeI", "cladeIII", "cladeIV", "others")] <- "Clade I+III+IV+Others"
+
+  phylo_counts <- as.data.frame(table(df$V2))
+  colnames(phylo_counts) <- c("phylogroup", "count")
+  return(phylo_counts)
 }
 
 count_data <- count_phylogroup_percentage(multpcr_phylogroup_file)
 total <- sum(count_data$count) 
+
+level_order <- c("A", "B1", "B2", "C", "D", "E", "F", "G", "Shig", "Clade I+III+IV+Others")
+unique_data_levels <- levels(factor(count_data$phylogroup))
+level_order_present <- intersect(level_order, unique_data_levels)
+count_data$phylogroup <- factor(count_data$phylogroup, levels = level_order_present)
 
 # 绘制饼图
 pie <- ggplot(count_data, aes(x = "", y = count, fill = phylogroup)) +
