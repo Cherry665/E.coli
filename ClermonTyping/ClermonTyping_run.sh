@@ -1,5 +1,5 @@
 #!/bin/bash
-#BSUB -J clermont[0-9]       
+#BSUB -J clermont[1-10]       
 #BSUB -q mpi
 #BSUB -n 24                         
 #BSUB -R "span[hosts=1]"            
@@ -8,7 +8,7 @@
 #BSUB -e logs/err.%J
 
 # --- 定位列表 ---
-INDEX=$(printf "%02d" $LSB_JOBINDEX)
+INDEX=$(printf "%02d" $((LSB_JOBINDEX - 1)))
 MY_LIST="task_list_${INDEX}.list"
 MY_BASE_DIR="results_part_${INDEX}"
 mkdir -p "$MY_BASE_DIR"
